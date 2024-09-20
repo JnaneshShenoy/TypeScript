@@ -1,0 +1,131 @@
+// Intrfaces
+interface IProduct {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface ElectronicProduct extends IProduct {
+  warrantyPeriod: string;
+}
+
+interface ClothingProduct extends IProduct {
+  size: string;
+  color: string;
+}
+
+// Decorators
+function ValidateNonEmpty(target: any, propertyKey: string | symbol) {
+  const originalMethod = target[propertyKey as string];
+
+  target[propertyKey as string] = function (...args: any[]) {
+    const [product] = args;
+
+    if (!product.name || product.price === undefined) {
+      throw new Error(
+        `Validation failed: ${String(
+          propertyKey
+        )} - Name and Price are required.`
+      );
+    }
+
+    return originalMethod.apply(this, args);
+  };
+}
+
+// ProductService class
+class ProductService<T extends IProduct> {
+  private products: Map<string, T> = new Map();
+
+  // Create: Add a new product
+  @ValidateNonEmpty
+  create(product: T): void {
+    if (this.products.has(product.id)) {
+      throw new Error("Product already exists.");
+    }
+    this.products.set(product.id, product);
+  }
+
+  // Read: Retrieve a product by its ID
+  read(id: string): T | undefined {
+    return this.products.get(id);
+  }
+
+  // Update: Modify an existing product
+  @ValidateNonEmpty
+  update(id: string, updatedProduct: Partial<T>): void {
+    const product = this.products.get(id);
+
+    if (!product) {
+      throw new Error("Product not found.");
+    }
+
+    this.products.set(id, { ...product, ...updatedProduct } as T);
+  }
+
+  // Delete: Remove a product
+  delete(id: string): void {
+    if (!this.products.has(id)) {
+      throw new Error("Product not found.");
+    }
+    this.products.delete(id);
+  }
+
+  // getAll: Retrieve all products
+  getAll(): T[] {
+    return Array.from(this.products.values());
+  }
+}
+
+// Instantiate the ProductService for different product types
+const electronicProductService = new ProductService<ElectronicProduct>();
+const clothingProductService = new ProductService<ClothingProduct>();
+
+// Create new products
+const phone: ElectronicProduct = {
+  id: "1",
+  name: "Smartphone",
+  price: 299.99,
+  warrantyPeriod: "2 years",
+};
+
+const tshirt: ClothingProduct = {
+  id: "2",
+  name: "T-Shirt",
+  price: 19.99,
+  size: "M",
+  color: "Blue",
+};
+
+// Add products to the services
+electronicProductService.create(phone);
+clothingProductService.create(tshirt);
+
+// Retrieve and display all products
+console.log("All electronic products:", electronicProductService.getAll());
+console.log("All clothing products:", clothingProductService.getAll());
+
+// Update a product
+try {
+  electronicProductService.update("1", { price: 279.99 });
+  console.log(
+    "Updated electronic product:",
+    electronicProductService.read("1")
+  );
+} catch (error) {
+  console.error("Error updating product:", error);
+}
+
+// Attempt to retrieve the updated product
+console.log("Updated electronic product:", electronicProductService.read("1"));
+
+// Delete a product
+try {
+  clothingProductService.delete("2");
+  console.log(
+    "Remaining clothing products after deletion:",
+    clothingProductService.getAll()
+  );
+} catch (error) {
+  console.error("Error deleting product:", error);
+}

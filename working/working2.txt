@@ -1,0 +1,136 @@
+// Import reflect-metadata for decorator use
+// import "reflect-metadata";
+
+// Define the base interface for all products
+interface IProduct {
+  id: number;
+  name: string;
+  price: number;
+}
+
+// Define the Mobile interface, extending IProduct
+interface Mobile extends IProduct {
+  warrantyPeriod: number;
+}
+
+// Define the Food interface, extending IProduct
+interface Food extends IProduct {
+  expiryDate: string;
+}
+
+// Validation decorator for non-empty fields
+function ValidateNonEmpty(
+  target: any,
+  propertyKey: string,
+  descriptor: PropertyDescriptor
+) {
+  const originalMethod = descriptor.value;
+
+  descriptor.value = function (...args: any[]) {
+    const product = args[0]; // First argument is the product object
+
+    if (!product.name || product.name.trim() === "") {
+      throw new Error("Product name cannot be empty.");
+    }
+    if (product.price == null || product.price <= 0) {
+      throw new Error("Product price must be greater than 0.");
+    }
+
+    // Additional field checks depending on product type
+    if ("warrantyPeriod" in product && product.warrantyPeriod <= 0) {
+      throw new Error("Warranty period must be greater than 0.");
+    }
+
+    if ("expiryDate" in product && new Date(product.expiryDate) <= new Date()) {
+      throw new Error("Expiry date must be in the future.");
+    }
+
+    return originalMethod.apply(this, args);
+  };
+}
+
+// Generic ProductService class
+class ProductService<T extends IProduct> {
+  private products: T[] = [];
+
+  // Apply the validation decorator to the create method
+  @ValidateNonEmpty
+  create(product: T): T {
+    this.products.push(product);
+    return product;
+  }
+
+  // Read a product by ID
+  read(productId: number): T | undefined {
+    return this.products.find((product) => product.id === productId);
+  }
+
+  // Apply the validation decorator to the update method
+  @ValidateNonEmpty
+  update(productId: number, updatedProduct: Partial<T>): T | undefined {
+    const productIndex = this.products.findIndex(
+      (product) => product.id === productId
+    );
+    if (productIndex === -1) {
+      throw new Error("Product not found.");
+    }
+
+    const currentProduct = this.products[productIndex];
+    const newProduct = { ...currentProduct, ...updatedProduct };
+
+    this.products[productIndex] = newProduct as T;
+    return this.products[productIndex];
+  }
+
+  // Delete a product
+  delete(productId: number): void {
+    const productIndex = this.products.findIndex(
+      (product) => product.id === productId
+    );
+    if (productIndex === -1) {
+      throw new Error("Product not found.");
+    }
+    this.products.splice(productIndex, 1);
+  }
+
+  // Get all products
+  getAll(): T[] {
+    return this.products;
+  }
+}
+
+// Create a Mobile service
+const mobileService = new ProductService<Mobile>();
+
+// Create a new Mobile product
+const samsung: Mobile = {
+  id: 1,
+  name: "Samsung Galaxy S22",
+  price: 799,
+  warrantyPeriod: 12,
+};
+mobileService.create(samsung);
+
+console.log("Mobile Products: ", mobileService.getAll());
+
+// Update the Mobile product
+mobileService.update(1, { price: 699 });
+console.log("Updated Mobile Product: ", mobileService.read(1));
+
+// Delete the Mobile product
+mobileService.delete(1);
+console.log("Mobile Products after deletion: ", mobileService.getAll());
+
+// Create a Food service
+const foodService = new ProductService<Food>();
+
+// Create a new Food product
+const apple: Food = {
+  id: 1,
+  name: "Apple",
+  price: 1.5,
+  expiryDate: "2024-12-31",
+};
+foodService.create(apple);
+
+console.log("Food Products: ", foodService.getAll());
